@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/plugins/population_density_analysis" >
+        <file>icon.png</file>
+    </qresource>
+</RCC>
