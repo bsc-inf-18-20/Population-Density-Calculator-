@@ -203,6 +203,8 @@
 
 
 # # -*- coding: utf-8 -*-
+
+
 import os
 from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
 from qgis.PyQt.QtGui import QIcon
@@ -269,14 +271,25 @@ class PopulationDensityAnalysis:
     def connect_to_db(self):
         """Establish a database connection."""
         uri = QgsDataSourceUri()
-        uri.setConnection('localhost', '5432', 'population_density_calculator', 'postgres', '1234')  # Update credentials
+        uri.setConnection('localhost', '5432', 'population density calculator', 'postgres', '1234')  # Update credentials
         return uri
 
     def populate_layers(self):
         """Populate layers in the combo box."""
-        layers = [layer.name() for layer in self.iface.mapCanvas().layers()]
-        self.dlg.layerComboBox.clear()
-        self.dlg.layerComboBox.addItems(layers)
+        try:
+            if not hasattr(self.dlg, "layerComboBox"):
+                raise AttributeError("The 'layerComboBox' widget is missing from the dialog.")
+
+            layers = [layer.name() for layer in self.iface.mapCanvas().layers()]
+            if not layers:
+                self.iface.messageBar().pushMessage("Info", "No layers found in the map canvas.", level=2)
+                return
+
+            self.dlg.layerComboBox.clear()
+            self.dlg.layerComboBox.addItems(layers)
+
+        except Exception as e:
+            self.iface.messageBar().pushMessage("Error", str(e), level=3)
 
     def populate_districts(self):
         """Fetch and display available districts."""
@@ -285,10 +298,10 @@ class PopulationDensityAnalysis:
             self.iface.messageBar().pushMessage("Error", "Please select a layer first.", level=3)
             return
 
-        query = f"SELECT DISTINCT DIST_NAME FROM {selected_layer};"
+        query = f"SELECT DISTINCT \"DIST_NAME\" FROM \"{selected_layer}\";"  # Fixed SQL quoting for table/column names
         uri = self.connect_to_db()
         uri.setDataSource("", f"({query})", "geom")  # Adjust geometry column as needed
-        layer = QgsVectorLayer(uri.uri(), "Districts", "postgres")
+        layer = QgsVectorLayer(uri.uri(), "DIST_NAME", "postgres")
         if layer.isValid():
             self.dlg.districtComboBox.clear()
             features = layer.getFeatures()
@@ -306,10 +319,10 @@ class PopulationDensityAnalysis:
             return
 
         query = f"""
-        SELECT SUM(TOTAL_POP) / SUM(ST_Area(geom)) AS density
-        FROM {selected_layer}
-        WHERE DIST_NAME = '{selected_district}';
-        """
+        SELECT SUM(\"TOTAL_POP\") / SUM(ST_Area(geom)) AS density
+        FROM \"{selected_layer}\"
+        WHERE \"DIST_NAME\" = '{selected_district}';
+        """  # Fixed quoting for SQL strings and column names
         uri = self.connect_to_db()
         uri.setDataSource("", f"({query})", "geom")  # Adjust geometry column as needed
         layer = QgsVectorLayer(uri.uri(), "Population Density", "postgres")
