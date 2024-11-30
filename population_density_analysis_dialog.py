@@ -45,20 +45,44 @@
 
 
 
-# # -*- coding: utf-8 -*-
-from PyQt5 import uic, QtWidgets
-
-# Load UI file
-FORM_CLASS, _ = uic.loadUiType("population_density_analysis_dialog_base.ui")
+# # # -*- coding: utf-8 -*-
 
 
-class PopulationDensityAnalysisDialog(QtWidgets.QDialog, FORM_CLASS):
+
+import os
+from qgis.PyQt import uic, QtWidgets
+from qgis.core import QgsDataSourceUri, QgsVectorLayer
+from qgis.PyQt.QtWidgets import QMessageBox
+
+FORM_CLASS, _ = uic.loadUiType(
+    os.path.join(os.path.dirname(__file__), "population_density_analysis_dialog_base.ui")
+)
+
+class population_density_analysisDialog(QtWidgets.QDialog, FORM_CLASS):
     def __init__(self, parent=None):
-        """Dialog constructor."""
-        super(PopulationDensityAnalysisDialog, self).__init__(parent)
+        """Constructor."""
+        super(population_density_analysisDialog, self).__init__(parent)
         self.setupUi(self)
+        self.pushButton.clicked.connect(self.select_district)
 
-        # Ensure widgets exist
-        print(f"Layer ComboBox exists: {hasattr(self, 'layerComboBox')}")
-        print(f"District ComboBox exists: {hasattr(self, 'districtComboBox')}")
-        print(f"Output Label exists: {hasattr(self, 'outputLabel')}")
+    def select_district(self):
+        """Fetch and display districts from PostgreSQL."""
+        try:
+            connection_uri = QgsDataSourceUri()
+            connection_uri.setConnection(
+                "localhost", "5432", "population_density_calculator", "postgres", "1234"
+            )
+            connection_uri.setDataSource("public", "city_popn_EAS-2018-3", "geom")
+            layer = QgsVectorLayer(connection_uri.uri(), "Districts Layer", "postgres")
+
+            if not layer.isValid():
+                raise Exception("Failed to load layer. Check your database connection.")
+
+            districts = {feature["DIST_NAME"] for feature in layer.getFeatures() if feature["DIST_NAME"]}
+            if districts:
+                QMessageBox.information(self, "Districts", "\n".join(sorted(districts)))
+            else:
+                QMessageBox.warning(self, "No Districts", "No districts found in the data.")
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"An error occurred: {str(e)}")

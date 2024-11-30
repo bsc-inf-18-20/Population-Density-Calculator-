@@ -39,7 +39,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>Select layer</string>
+    <string>select distric</string>
    </property>
   </widget>
   <widget class="QPushButton" name="pushButton_2">
@@ -52,7 +52,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>select district</string>
+    <string>display total population</string>
    </property>
   </widget>
   <widget class="QPushButton" name="pushButton_3">

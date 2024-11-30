@@ -47,8 +47,8 @@ class Ui_population_density_analysisDialogBase(object):
     def retranslateUi(self, population_density_analysisDialogBase):
         _translate = QtCore.QCoreApplication.translate
         population_density_analysisDialogBase.setWindowTitle(_translate("population_density_analysisDialogBase", "population_density_analysis"))
-        self.pushButton.setText(_translate("population_density_analysisDialogBase", "Select layer"))
-        self.pushButton_2.setText(_translate("population_density_analysisDialogBase", "select district"))
+        self.pushButton.setText(_translate("population_density_analysisDialogBase", "select distric"))
+        self.pushButton_2.setText(_translate("population_density_analysisDialogBase", "display total population"))
         self.pushButton_3.setText(_translate("population_density_analysisDialogBase", "........."))
         self.pushButton_4.setText(_translate("population_density_analysisDialogBase", "........"))
         self.pushButton_5.setText(_translate("population_density_analysisDialogBase", "output"))
