@@ -46,19 +46,19 @@
 
 
 # # -*- coding: utf-8 -*-
-
-
 from PyQt5 import uic, QtWidgets
-import os
+
+# Load UI file
+FORM_CLASS, _ = uic.loadUiType("population_density_analysis_dialog_base.ui")
 
 
-FORM_CLASS, _ = uic.loadUiType(os.path.join(
-    os.path.dirname(__file__), 'population_density_analysis_dialog_base.ui'))
-
-
-class population_density_analysisDialog(QtWidgets.QDialog, FORM_CLASS):
+class PopulationDensityAnalysisDialog(QtWidgets.QDialog, FORM_CLASS):
     def __init__(self, parent=None):
-        """Constructor."""
-        super(population_density_analysisDialog, self).__init__(parent)
+        """Dialog constructor."""
+        super(PopulationDensityAnalysisDialog, self).__init__(parent)
         self.setupUi(self)
 
+        # Ensure widgets exist
+        print(f"Layer ComboBox exists: {hasattr(self, 'layerComboBox')}")
+        print(f"District ComboBox exists: {hasattr(self, 'districtComboBox')}")
+        print(f"Output Label exists: {hasattr(self, 'outputLabel')}")

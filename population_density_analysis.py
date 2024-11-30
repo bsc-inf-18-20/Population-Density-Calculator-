@@ -203,99 +203,60 @@
 
 
 # # -*- coding: utf-8 -*-
-
-
-
-from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication
+import os
+from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
 from qgis.core import QgsDataSourceUri, QgsVectorLayer
-
-from .population_density_analysis_dialog import population_density_analysisDialog
-import os.path
+from .population_density_analysis_dialog import PopulationDensityAnalysisDialog
 
 
-class population_density_analysis:
+class PopulationDensityAnalysis:
     """QGIS Plugin Implementation."""
 
     def __init__(self, iface):
         """Constructor."""
         self.iface = iface
         self.plugin_dir = os.path.dirname(__file__)
+        self.dlg = None
+
+        # Localization
         locale = QSettings().value('locale/userLocale')[0:2]
-        locale_path = os.path.join(
-            self.plugin_dir,
-            'i18n',
-            'population_density_analysis_{}.qm'.format(locale))
+        locale_path = os.path.join(self.plugin_dir, 'i18n', f'population_density_analysis_{locale}.qm')
         if os.path.exists(locale_path):
             self.translator = QTranslator()
             self.translator.load(locale_path)
             QCoreApplication.installTranslator(self.translator)
 
-        self.actions = []
-        self.menu = self.tr(u'&Population Density Analysis')
-        self.first_start = None
-
     def tr(self, message):
         """Translate a message."""
-        return QCoreApplication.translate('population_density_analysis', message)
+        return QCoreApplication.translate('PopulationDensityAnalysis', message)
 
-    def add_action(
-        self,
-        icon_path,
-        text,
-        callback,
-        enabled_flag=True,
-        add_to_menu=True,
-        add_to_toolbar=True,
-        status_tip=None,
-        whats_this=None,
-        parent=None):
-        """Add a toolbar icon to the toolbar."""
+    def add_action(self, icon_path, text, callback, parent=None):
+        """Add an action to the plugin."""
         icon = QIcon(icon_path)
         action = QAction(icon, text, parent)
         action.triggered.connect(callback)
-        action.setEnabled(enabled_flag)
-
-        if status_tip:
-            action.setStatusTip(status_tip)
-
-        if whats_this:
-            action.setWhatsThis(whats_this)
-
-        if add_to_toolbar:
-            self.iface.addToolBarIcon(action)
-
-        if add_to_menu:
-            self.iface.addPluginToMenu(self.menu, action)
-
-        self.actions.append(action)
-
+        self.iface.addToolBarIcon(action)
+        self.iface.addPluginToMenu(self.tr('&Population Density Analysis'), action)
         return action
 
     def initGui(self):
-        """Create the menu entries and toolbar icons."""
+        """Create menu entries and toolbar icons."""
         icon_path = ':/plugins/population_density_analysis/icon.png'
-        self.add_action(
-            icon_path,
-            text=self.tr(u'Population Density Analysis'),
-            callback=self.run,
-            parent=self.iface.mainWindow())
-        self.first_start = True
+        self.add_action(icon_path, text=self.tr('Population Density Analysis'), callback=self.run)
 
     def unload(self):
-        """Remove the plugin menu item and icon."""
-        for action in self.actions:
-            self.iface.removePluginMenu(self.tr(u'&Population Density Analysis'), action)
-            self.iface.removeToolBarIcon(action)
+        """Remove plugin menu items."""
+        self.iface.removePluginMenu(self.tr('&Population Density Analysis'), self.dlg)
+        self.iface.removeToolBarIcon(self.dlg)
 
     def run(self):
         """Run the plugin."""
-        if self.first_start:
-            self.first_start = False
-            self.dlg = population_density_analysisDialog()
+        if not self.dlg:
+            self.dlg = PopulationDensityAnalysisDialog()
 
-            # Connect UI buttons
+            # Connect buttons to methods
             self.dlg.pushButton.clicked.connect(self.populate_layers)
             self.dlg.pushButton_2.clicked.connect(self.populate_districts)
             self.dlg.pushButton_5.clicked.connect(self.calculate_density)
@@ -306,48 +267,57 @@ class population_density_analysis:
             pass
 
     def connect_to_db(self):
-        """Establish database connection."""
+        """Establish a database connection."""
         uri = QgsDataSourceUri()
-        uri.setConnection('localhost', '5432', 'gis_db', 'user', 'password')
+        uri.setConnection('localhost', '5432', 'population_density_calculator', 'postgres', '1234')  # Update credentials
         return uri
 
-    def populate_combobox(self, combo_box, table, column):
-        """Populate a combo box with unique values from a database table."""
-        uri = self.connect_to_db()
-        layer = QgsVectorLayer(f"{uri.uri()} table=\"{table}\" (geometry) key=\"{column}\"", table, "postgres")
-        if layer.isValid():
-            combo_box.clear()
-            features = layer.getFeatures()
-            combo_box.addItems([f[column] for f in features])
-        else:
-            self.iface.messageBar().pushMessage("Error", "Failed to load data from the database.", level=3)
-
     def populate_layers(self):
-        """Populate the layers combo box."""
-        self.populate_combobox(self.dlg.layerComboBox, 'layer_table', 'layer_column')
+        """Populate layers in the combo box."""
+        layers = [layer.name() for layer in self.iface.mapCanvas().layers()]
+        self.dlg.layerComboBox.clear()
+        self.dlg.layerComboBox.addItems(layers)
 
     def populate_districts(self):
-        """Populate the districts combo box."""
-        self.populate_combobox(self.dlg.districtComboBox, 'district_table', 'district_column')
+        """Fetch and display available districts."""
+        selected_layer = self.dlg.layerComboBox.currentText()
+        if not selected_layer:
+            self.iface.messageBar().pushMessage("Error", "Please select a layer first.", level=3)
+            return
+
+        query = f"SELECT DISTINCT DIST_NAME FROM {selected_layer};"
+        uri = self.connect_to_db()
+        uri.setDataSource("", f"({query})", "geom")  # Adjust geometry column as needed
+        layer = QgsVectorLayer(uri.uri(), "Districts", "postgres")
+        if layer.isValid():
+            self.dlg.districtComboBox.clear()
+            features = layer.getFeatures()
+            self.dlg.districtComboBox.addItems([feature['DIST_NAME'] for feature in features])
+        else:
+            self.iface.messageBar().pushMessage("Error", "Failed to load districts from the database.", level=3)
 
     def calculate_density(self):
         """Calculate population density."""
-        layer_name = self.dlg.layerComboBox.currentText()
-        district_name = self.dlg.districtComboBox.currentText()
-        uri = self.connect_to_db()
+        selected_layer = self.dlg.layerComboBox.currentText()
+        selected_district = self.dlg.districtComboBox.currentText()
+
+        if not selected_layer or not selected_district:
+            self.iface.messageBar().pushMessage("Error", "Please select a layer and a district.", level=3)
+            return
 
         query = f"""
-        SELECT SUM(population) / SUM(area) AS density
-        FROM {layer_name}
-        WHERE district = '{district_name}';
+        SELECT SUM(TOTAL_POP) / SUM(ST_Area(geom)) AS density
+        FROM {selected_layer}
+        WHERE DIST_NAME = '{selected_district}';
         """
-        layer = QgsVectorLayer(f"{uri.uri()} sql={query}", "Population Density", "postgres")
+        uri = self.connect_to_db()
+        uri.setDataSource("", f"({query})", "geom")  # Adjust geometry column as needed
+        layer = QgsVectorLayer(uri.uri(), "Population Density", "postgres")
         if layer.isValid():
             features = layer.getFeatures()
             for feature in features:
                 density = feature['density']
-                self.dlg.outputLabel.setText(f"Population Density: {density}")
+                self.dlg.outputLabel.setText(f"Population Density: {density:.2f}")
                 break
         else:
             self.iface.messageBar().pushMessage("Error", "Failed to calculate population density.", level=3)
-
